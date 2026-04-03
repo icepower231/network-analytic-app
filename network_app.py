@@ -1,100 +1,98 @@
 import streamlit as st
+import speedtest
+import pandas as pd
 
-# 1. Настройка темы и страницы
+# 1. Настройка страницы и темы
 st.set_page_config(
-    page_title="Сетевой Аналитик v1.0",
+    page_title="Сетевой Аналитик v1.1",
     page_icon="⚡",
-    layout="wide",
-    initial_sidebar_state="expanded"
+    layout="wide"
 )
 
-# 2. Кастомный CSS для "ламповой" фиолетовой темы
+# 2. Кастомный CSS для стиля REGRONT (Фиолетовый + Темный)
 st.markdown("""
     <style>
-    /* Основной фон и шрифт */
     .stApp {
         background-color: #0E1117;
         color: #FFFFFF;
     }
-    /* Заголовки */
     h1, h2, h3 {
         color: #9D50BB !important;
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     }
-    /* Сайдбар */
-    [data-testid="stSidebar"] {
-        background-color: #161B22;
-        border-right: 1px solid #30363D;
-    }
-    /* Кнопка рассчитать */
     .stButton>button {
         width: 100%;
         background: linear-gradient(45deg, #6E48AA, #9D50BB);
         color: white;
-        border: none;
-        padding: 0.5rem;
         border-radius: 10px;
+        border: none;
+        height: 3em;
         font-weight: bold;
-        transition: 0.3s;
     }
-    .stButton>button:hover {
-        transform: scale(1.02);
-        box-shadow: 0 4px 15px rgba(157, 80, 187, 0.4);
-    }
-    /* Карточки с метриками */
     [data-testid="stMetricValue"] {
         color: #00FFC2 !important;
+    }
+    .stSidebar {
+        background-color: #161B22;
     }
     </style>
     """, unsafe_allow_html=True)
 
-# 3. Боковая панель (Ввод данных)
+# 3. Боковая панель
 with st.sidebar:
-    st.image("https://img.icons8.com/fluency/96/network-interlace.png", width=80)
-    st.title("Панель управления")
-    st.write("Введите параметры вашей сети для анализа.")
-    st.markdown("---")
-    
-    speed_input = st.number_input("Скорость провайдера (Мбит/с)", min_value=1.0, max_value=10000.0, value=100.0)
+    st.title("⚙️ Настройки")
+    st.write("Параметры для ручного расчета:")
+    manual_speed = st.number_input("Скорость провайдера (Мбит/с)", min_value=1.0, value=100.0)
     overhead = st.slider("Служебные заголовки (%)", 0, 20, 5)
-    
-    calculate = st.button("🚀 ЗАПУСТИТЬ АНАЛИЗ")
+    st.info("Обычно Overhead составляет 5-7% для TCP/IP соединений.")
 
-# 4. Основная часть интерфейса
+# 4. Основной интерфейс
 st.title("🛰️ Система анализа пропускной способности")
-st.info("Данный инструмент рассчитывает Goodput (полезную нагрузку) на основе технических параметров канала.")
 
-col1, col2, col3 = st.columns(3)
+# Блок реального спидтеста
+st.subheader("🌐 Реальный замер скорости")
+st.write("Нажмите кнопку ниже, чтобы измерить текущую скорость вашего интернет-соединения.")
 
-if calculate:
-    # Логика расчета
-    loss_factor = (100 - overhead) / 100
-    goodput_val = speed_input * loss_factor
-    
-    with col1:
-        st.metric("Входная скорость", f"{speed_input} Mbps")
-    
-    with col2:
-        st.metric("Потери (Overhead)", f"{overhead}%", delta_color="inverse")
-        
-    with col3:
-        st.metric("Итоговый Goodput", f"{goodput_val:.2f} Mbps")
+if st.button("🚀 ЗАПУСТИТЬ ТЕСТ СКОРОСТИ"):
+    with st.spinner("Связываемся с сервером... Это займет около 20 секунд"):
+        try:
+            st_test = speedtest.Speedtest()
+            st_test.get_best_server()
+            
+            # Замер загрузки
+            download_res = st_test.download() / 1_000_000 
+            
+            st.success(f"Тест завершен успешно!")
+            
+            col_res1, col_res2 = st.columns(2)
+            with col_res1:
+                st.metric("Реальная скорость (Download)", f"{download_res:.2f} Mbps")
+            with col_res2:
+                # Считаем Goodput на основе замера
+                real_goodput = download_res * ((100 - overhead) / 100)
+                st.metric("Чистый Goodput", f"{real_goodput:.2f} Mbps")
+            
+            st.warning(f"Из-за заголовков протоколов вы теряете около {download_res - real_goodput:.2f} Мбит/с полезной скорости.")
+        except Exception as e:
+            st.error("Ошибка при замере. Попробуйте еще раз или используйте ручной ввод.")
 
-    st.markdown("---")
-    
-    # Секция с графиком или пояснением
-    st.subheader("📝 Заключение аналитика")
-    st.write(f"""
-    При заявленной скорости в **{speed_input} Мбит/с**, реальная полезная нагрузка составит **{goodput_val:.2f} Мбит/с**. 
-    Разница уходит на служебную информацию протоколов (TCP/IP заголовки) и проверку целостности данных.
-    """)
-    
-    st.success("Данные актуальны для индивидуального проекта 'Расчет пропускной способности'.")
-else:
-    st.warning("⬅️ Настройте параметры слева и нажмите кнопку для расчета.")
+st.markdown("---")
 
-# Подвал
+# Блок ручного калькулятора (то, что было раньше)
+st.subheader("📊 Теоретический расчет")
+calc_col1, calc_col2, calc_col3 = st.columns(3)
+
+loss_factor = (100 - overhead) / 100
+calc_goodput = manual_speed * loss_factor
+
+with calc_col1:
+    st.metric("Входная скорость", f"{manual_speed} Mbps")
+with calc_col2:
+    st.metric("Потери (Overhead)", f"{overhead}%")
+with calc_col3:
+    st.metric("Итоговый Goodput", f"{calc_goodput:.2f} Mbps")
+
+# 5. Заключение и подвал
+st.info(f"При скорости {manual_speed} Мбит/с, реальная полезная нагрузка составит {calc_goodput:.2f} Мбит/с. Это данные для вашего проекта.")
+
 st.markdown("---")
 st.caption("© 2026 Разработано REGRONT | Специальность: Инфокоммуникационные сети")
-
-
