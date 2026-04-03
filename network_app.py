@@ -1,61 +1,100 @@
 import streamlit as st
-import pandas as pd
 
-# Настройка страницы
-st.set_page_config(page_title="Сетевой Аналитик v1.0", page_icon="🚀")
+# 1. Настройка темы и страницы
+st.set_page_config(
+    page_title="Сетевой Аналитик v1.0",
+    page_icon="⚡",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
-st.title("🚀 Сетевой Аналитик v1.0")
-st.write("Проект по расчету пропускной способности и анализу Goodput")
+# 2. Кастомный CSS для "ламповой" фиолетовой темы
+st.markdown("""
+    <style>
+    /* Основной фон и шрифт */
+    .stApp {
+        background-color: #0E1117;
+        color: #FFFFFF;
+    }
+    /* Заголовки */
+    h1, h2, h3 {
+        color: #9D50BB !important;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    /* Сайдбар */
+    [data-testid="stSidebar"] {
+        background-color: #161B22;
+        border-right: 1px solid #30363D;
+    }
+    /* Кнопка рассчитать */
+    .stButton>button {
+        width: 100%;
+        background: linear-gradient(45deg, #6E48AA, #9D50BB);
+        color: white;
+        border: none;
+        padding: 0.5rem;
+        border-radius: 10px;
+        font-weight: bold;
+        transition: 0.3s;
+    }
+    .stButton>button:hover {
+        transform: scale(1.02);
+        box-shadow: 0 4px 15px rgba(157, 80, 187, 0.4);
+    }
+    /* Карточки с метриками */
+    [data-testid="stMetricValue"] {
+        color: #00FFC2 !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
-st.divider()
-
-# Упрощенный блок расчета
-st.header("Расчет полезной нагрузки (Goodput)")
-st.write("Введите скорость из любого теста (например, со speedtest.net):")
-
-# Поле ввода
-manual_speed = st.number_input("Скорость от провайдера (Мбит/с):", value=100.0)
-
-# Кнопка, которая СРАЗУ выводит всё под собой
-if st.button("РАССЧИТАТЬ ДАННЫЕ"):
-    st.balloons() # Праздничные шарики
-    
-    # Математика
-    efficiency = 1460 / 1500 
-    real_speed = manual_speed * efficiency
-    overhead = manual_speed - real_speed
-    
-    # ВЫВОД РЕЗУЛЬТАТОВ (Делаем максимально крупно)
+# 3. Боковая панель (Ввод данных)
+with st.sidebar:
+    st.image("https://img.icons8.com/fluency/96/network-interlace.png", width=80)
+    st.title("Панель управления")
+    st.write("Введите параметры вашей сети для анализа.")
     st.markdown("---")
-    st.subheader("📊 Результаты анализа:")
     
-    col1, col2 = st.columns(2)
+    speed_input = st.number_input("Скорость провайдера (Мбит/с)", min_value=1.0, max_value=10000.0, value=100.0)
+    overhead = st.slider("Служебные заголовки (%)", 0, 20, 5)
+    
+    calculate = st.button("🚀 ЗАПУСТИТЬ АНАЛИЗ")
+
+# 4. Основная часть интерфейса
+st.title("🛰️ Система анализа пропускной способности")
+st.info("Данный инструмент рассчитывает Goodput (полезную нагрузку) на основе технических параметров канала.")
+
+col1, col2, col3 = st.columns(3)
+
+if calculate:
+    # Логика расчета
+    loss_factor = (100 - overhead) / 100
+    goodput_val = speed_input * loss_factor
+    
     with col1:
-        st.metric("Чистые данные (Goodput)", f"{real_speed:.2f} Мбит/с")
+        st.metric("Входная скорость", f"{speed_input} Mbps")
+    
     with col2:
-        st.metric("Потери (Overhead)", f"{overhead:.2f} Мбит/с", delta_color="inverse")
+        st.metric("Потери (Overhead)", f"{overhead}%", delta_color="inverse")
+        
+    with col3:
+        st.metric("Итоговый Goodput", f"{goodput_val:.2f} Mbps")
+
+    st.markdown("---")
     
-    st.info(f"💡 Реальная скорость скачивания: **{real_speed/8:.2f} Мбайт/с**")
-
-    # ГРАФИК
-    st.write("### Сравнение скоростей")
-    chart_data = pd.DataFrame({
-        "Показатель": ["Провайдер", "Реальные данные"],
-        "Мбит/с": [manual_speed, real_speed]
-    })
-    st.bar_chart(chart_data, x="Показатель", y="Мбит/с")
+    # Секция с графиком или пояснением
+    st.subheader("📝 Заключение аналитика")
+    st.write(f"""
+    При заявленной скорости в **{speed_input} Мбит/с**, реальная полезная нагрузка составит **{goodput_val:.2f} Мбит/с**. 
+    Разница уходит на служебную информацию протоколов (TCP/IP заголовки) и проверку целостности данных.
+    """)
     
-    st.write(f"**Пояснение:** Мы вычли {(1-efficiency)*100:.1f}% на заголовки пакетов.")
+    st.success("Данные актуальны для индивидуального проекта 'Расчет пропускной способности'.")
+else:
+    st.warning("⬅️ Настройте параметры слева и нажмите кнопку для расчета.")
 
-st.divider()
-
-# Справочник (всегда виден внизу)
-st.write("### Справочник технологий")
-tech_table = pd.DataFrame({
-    "Технология": ["Ethernet", "Wi-Fi 6", "5G", "Starlink"],
-    "Макс. (Мбит/с)": [1000, 9600, 2000, 250],
-    "Средняя (Мбит/с)": [940, 600, 200, 100]
-})
-st.table(tech_table)
+# Подвал
+st.markdown("---")
+st.caption("© 2026 Разработано REGRONT | Специальность: Инфокоммуникационные сети")
 
 
